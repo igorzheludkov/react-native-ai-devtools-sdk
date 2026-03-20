@@ -1,5 +1,7 @@
 export interface InitOptions {
     maxNetworkEntries?: number;
+    maxConsoleEntries?: number;
+    stores?: Record<string, unknown>;
 }
 
 export interface NetworkEntry {
@@ -36,10 +38,34 @@ export interface NetworkStats {
     byDomain: Record<string, number>;
 }
 
+export interface ConsoleEntry {
+    id: string;
+    timestamp: number;
+    level: 'log' | 'warn' | 'error' | 'info' | 'debug';
+    message: string;
+}
+
+export interface ConsoleQueryOptions {
+    count?: number;
+    level?: 'log' | 'warn' | 'error' | 'info' | 'debug';
+    text?: string;
+}
+
+export interface Capabilities {
+    network: boolean;
+    console: boolean;
+    stores: boolean;
+    render: boolean;
+}
+
 export interface DevToolsGlobal {
     version: string;
+    capabilities: Capabilities;
+    stores: Record<string, unknown>;
     getNetworkRequests: (options?: NetworkQueryOptions) => NetworkEntry[];
     getNetworkRequest: (id: string) => NetworkEntry | null;
     getNetworkStats: () => NetworkStats;
     clearNetwork: () => number;
+    getConsoleLogs: (options?: ConsoleQueryOptions) => ConsoleEntry[];
+    clearConsole: () => number;
 }

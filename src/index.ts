@@ -1,5 +1,7 @@
 import { NetworkBuffer } from './networkBuffer';
+import { ConsoleBuffer } from './consoleBuffer';
 import { patchFetch } from './networkInterceptor';
+import { patchConsole } from './consoleInterceptor';
 import { exposeGlobal } from './global';
 import { InitOptions } from './types';
 
@@ -8,6 +10,9 @@ export type {
     NetworkEntry,
     NetworkQueryOptions,
     NetworkStats,
+    ConsoleEntry,
+    ConsoleQueryOptions,
+    Capabilities,
     DevToolsGlobal,
 } from './types';
 
@@ -25,11 +30,24 @@ export function init(options?: InitOptions): void {
         return;
     }
 
-    const maxSize = options?.maxNetworkEntries ?? 500;
-    const buffer = new NetworkBuffer(maxSize);
+    const networkBuffer = new NetworkBuffer(options?.maxNetworkEntries ?? 500);
+    const consoleBuffer = new ConsoleBuffer(options?.maxConsoleEntries ?? 500);
+    const stores = options?.stores ?? {};
 
-    patchFetch(buffer);
-    exposeGlobal(buffer);
+    patchFetch(networkBuffer);
+    patchConsole(consoleBuffer);
+
+    exposeGlobal({
+        networkBuffer,
+        consoleBuffer,
+        stores,
+        capabilities: {
+            network: true,
+            console: true,
+            stores: Object.keys(stores).length > 0,
+            render: false,
+        },
+    });
 
     initialized = true;
 }
