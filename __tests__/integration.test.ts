@@ -91,6 +91,7 @@ describe('integration', () => {
         expect(caps.network).toBe(true);
         expect(caps.console).toBe(true);
         expect(caps.stores).toBe(true);
+        expect(caps.navigation).toBe(false);
         expect(caps.render).toBe(false);
     });
 
@@ -98,6 +99,36 @@ describe('integration', () => {
         init();
 
         expect(globalThis.__RN_AI_DEVTOOLS__!.capabilities.stores).toBe(false);
+    });
+
+    it('exposes navigation on the global', () => {
+        const mockNav = { getCurrentRoute: () => 'Home' };
+        init({ navigation: mockNav });
+
+        expect(globalThis.__RN_AI_DEVTOOLS__!.navigation).toBe(mockNav);
+        expect(globalThis.__RN_AI_DEVTOOLS__!.capabilities.navigation).toBe(true);
+    });
+
+    it('navigation defaults to null when not provided', () => {
+        init();
+
+        expect(globalThis.__RN_AI_DEVTOOLS__!.navigation).toBeNull();
+        expect(globalThis.__RN_AI_DEVTOOLS__!.capabilities.navigation).toBe(false);
+    });
+
+    it('exposes custom references on the global', () => {
+        const asyncStorage = { getItem: () => null };
+        const mmkv = { getString: () => '' };
+        init({ custom: { asyncStorage, mmkv } });
+
+        expect(globalThis.__RN_AI_DEVTOOLS__!.custom.asyncStorage).toBe(asyncStorage);
+        expect(globalThis.__RN_AI_DEVTOOLS__!.custom.mmkv).toBe(mmkv);
+    });
+
+    it('custom defaults to empty object when not provided', () => {
+        init();
+
+        expect(globalThis.__RN_AI_DEVTOOLS__!.custom).toEqual({});
     });
 
     it('console methods are exposed on global', () => {

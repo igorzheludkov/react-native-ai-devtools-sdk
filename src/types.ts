@@ -2,6 +2,9 @@ export interface InitOptions {
     maxNetworkEntries?: number;
     maxConsoleEntries?: number;
     stores?: Record<string, unknown>;
+    navigation?: unknown;
+    /** Named references to any additional tools, services, or objects (e.g. AsyncStorage, MMKV, analytics) that don't belong to stores or navigation. */
+    custom?: Record<string, unknown>;
 }
 
 export interface NetworkEntry {
@@ -55,6 +58,7 @@ export interface Capabilities {
     network: boolean;
     console: boolean;
     stores: boolean;
+    navigation: boolean;
     render: boolean;
 }
 
@@ -62,6 +66,8 @@ export interface DevToolsGlobal {
     version: string;
     capabilities: Capabilities;
     stores: Record<string, unknown>;
+    navigation: unknown;
+    custom: Record<string, unknown>;
     getNetworkRequests: (options?: NetworkQueryOptions) => NetworkEntry[];
     getNetworkRequest: (id: string) => NetworkEntry | null;
     getNetworkStats: () => NetworkStats;

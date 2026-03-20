@@ -33,6 +33,8 @@ export function init(options?: InitOptions): void {
     const networkBuffer = new NetworkBuffer(options?.maxNetworkEntries ?? 500);
     const consoleBuffer = new ConsoleBuffer(options?.maxConsoleEntries ?? 500);
     const stores = options?.stores ?? {};
+    const navigation = options?.navigation ?? null;
+    const custom = options?.custom ?? {};
 
     patchFetch(networkBuffer);
     patchConsole(consoleBuffer);
@@ -41,10 +43,13 @@ export function init(options?: InitOptions): void {
         networkBuffer,
         consoleBuffer,
         stores,
+        navigation,
+        custom,
         capabilities: {
             network: true,
             console: true,
             stores: Object.keys(stores).length > 0,
+            navigation: navigation != null,
             render: false,
         },
     });

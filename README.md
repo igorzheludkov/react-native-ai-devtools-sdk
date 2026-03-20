@@ -63,6 +63,40 @@ The AI assistant can then inspect store state directly:
 execute_in_app with expression="globalThis.__RN_AI_DEVTOOLS__.stores.redux.getState()"
 ```
 
+### With navigation
+
+Pass your navigation reference for AI-powered navigation inspection:
+
+```js
+import { init } from 'react-native-ai-devtools-sdk';
+import { navigationRef } from './navigation';
+
+if (__DEV__) {
+  init({
+    navigation: navigationRef,
+  });
+}
+```
+
+### With custom references
+
+Use `custom` to expose any additional tools, services, or objects that don't belong to stores or navigation (e.g. AsyncStorage, MMKV, analytics):
+
+```js
+import { init } from 'react-native-ai-devtools-sdk';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './mmkv';
+
+if (__DEV__) {
+  init({
+    custom: {
+      asyncStorage: AsyncStorage,
+      mmkv: storage,
+    },
+  });
+}
+```
+
 ### Configuration options
 
 ```js
@@ -78,6 +112,15 @@ init({
     redux: reduxStore,
     queryClient: queryClient,
     userStore: useUserStore,
+  },
+
+  // Navigation reference
+  navigation: navigationRef,
+
+  // Any additional references for AI access
+  custom: {
+    asyncStorage: AsyncStorage,
+    mmkv: storage,
   },
 });
 ```
@@ -161,12 +204,19 @@ globalThis.__RN_AI_DEVTOOLS__ = {
   capabilities: {
     network: true,
     console: true,
-    stores: true,  // true if stores were passed
-    render: false,  // future: render profiling
+    stores: true,      // true if stores were passed
+    navigation: true,  // true if navigation was passed
+    render: false,     // future: render profiling
   },
 
   // State store references
   stores: { redux: store, queryClient: qc, ... },
+
+  // Navigation reference
+  navigation: navigationRef,
+
+  // Custom references (AsyncStorage, MMKV, etc.)
+  custom: { asyncStorage: AsyncStorage, mmkv: storage, ... },
 
   // Network
   getNetworkRequests(options?),  // { count, method, urlPattern, status }

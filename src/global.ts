@@ -11,16 +11,20 @@ export interface ExposeGlobalOptions {
     networkBuffer: NetworkBuffer;
     consoleBuffer: ConsoleBuffer;
     stores: Record<string, unknown>;
+    navigation: unknown;
+    custom: Record<string, unknown>;
     capabilities: Capabilities;
 }
 
 export function exposeGlobal(options: ExposeGlobalOptions): void {
-    const { networkBuffer, consoleBuffer, stores, capabilities } = options;
+    const { networkBuffer, consoleBuffer, stores, navigation, custom, capabilities } = options;
 
     const devtools: DevToolsGlobal = {
         version: '0.2.0',
         capabilities,
         stores,
+        navigation,
+        custom,
         getNetworkRequests: (opts?: NetworkQueryOptions) => networkBuffer.query(opts),
         getNetworkRequest: (id: string) => networkBuffer.get(id),
         getNetworkStats: () => networkBuffer.getStats(),
