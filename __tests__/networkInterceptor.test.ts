@@ -33,7 +33,7 @@ describe('networkInterceptor', () => {
         patchFetch(buffer);
         await globalThis.fetch('https://api.example.com/data');
 
-        const entries = buffer.query();
+        const entries = buffer.getAll();
         expect(entries).toHaveLength(1);
         expect(entries[0].method).toBe('GET');
         expect(entries[0].url).toBe('https://api.example.com/data');
@@ -54,7 +54,7 @@ describe('networkInterceptor', () => {
             body: JSON.stringify({ name: 'test' }),
         });
 
-        const entries = buffer.query();
+        const entries = buffer.getAll();
         expect(entries).toHaveLength(1);
         expect(entries[0].method).toBe('POST');
         expect(entries[0].requestBody).toBe('{"name":"test"}');
@@ -70,7 +70,7 @@ describe('networkInterceptor', () => {
             globalThis.fetch('https://api.example.com/fail'),
         ).rejects.toThrow('Network failure');
 
-        const entries = buffer.query();
+        const entries = buffer.getAll();
         expect(entries).toHaveLength(1);
         expect(entries[0].error).toBe('Network failure');
         expect(entries[0].completed).toBe(true);
@@ -111,7 +111,7 @@ describe('networkInterceptor', () => {
         // Wait for async body capture
         await new Promise((resolve) => setTimeout(resolve, 10));
 
-        const entries = buffer.query();
+        const entries = buffer.getAll();
         expect(entries[0].responseBody).toBe('cloned body');
     });
 });

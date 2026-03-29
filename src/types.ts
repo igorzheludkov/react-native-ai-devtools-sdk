@@ -24,34 +24,11 @@ export interface NetworkEntry {
     completed: boolean;
 }
 
-export interface NetworkQueryOptions {
-    count?: number;
-    method?: string;
-    urlPattern?: string;
-    status?: number;
-}
-
-export interface NetworkStats {
-    total: number;
-    completed: number;
-    errors: number;
-    avgDuration: number | null;
-    byMethod: Record<string, number>;
-    byStatus: Record<string, number>;
-    byDomain: Record<string, number>;
-}
-
 export interface ConsoleEntry {
     id: string;
     timestamp: number;
     level: 'log' | 'warn' | 'error' | 'info' | 'debug';
     message: string;
-}
-
-export interface ConsoleQueryOptions {
-    count?: number;
-    level?: 'log' | 'warn' | 'error' | 'info' | 'debug';
-    text?: string;
 }
 
 export interface Capabilities {
@@ -68,10 +45,8 @@ export interface DevToolsGlobal {
     stores: Record<string, unknown>;
     navigation: unknown;
     custom: Record<string, unknown>;
-    getNetworkRequests: (options?: NetworkQueryOptions) => NetworkEntry[];
-    getNetworkRequest: (id: string) => NetworkEntry | null;
-    getNetworkStats: () => NetworkStats;
+    getNetworkEntries: () => NetworkEntry[];
+    getConsoleEntries: () => ConsoleEntry[];
     clearNetwork: () => number;
-    getConsoleLogs: (options?: ConsoleQueryOptions) => ConsoleEntry[];
     clearConsole: () => number;
 }

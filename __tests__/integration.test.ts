@@ -35,17 +35,14 @@ describe('integration', () => {
         init();
 
         expect(globalThis.__RN_AI_DEVTOOLS__).toBeDefined();
-        expect(globalThis.__RN_AI_DEVTOOLS__!.version).toBe('0.2.0');
+        expect(globalThis.__RN_AI_DEVTOOLS__!.version).toBe('0.3.0');
 
         await globalThis.fetch('https://api.example.com/test');
 
-        const requests = globalThis.__RN_AI_DEVTOOLS__!.getNetworkRequests();
-        expect(requests).toHaveLength(1);
-        expect(requests[0].url).toBe('https://api.example.com/test');
-        expect(requests[0].status).toBe(200);
-
-        const stats = globalThis.__RN_AI_DEVTOOLS__!.getNetworkStats();
-        expect(stats.total).toBe(1);
+        const entries = globalThis.__RN_AI_DEVTOOLS__!.getNetworkEntries();
+        expect(entries).toHaveLength(1);
+        expect(entries[0].url).toBe('https://api.example.com/test');
+        expect(entries[0].status).toBe(200);
     });
 
     it('init() is idempotent', () => {
@@ -67,7 +64,7 @@ describe('integration', () => {
 
         const count = globalThis.__RN_AI_DEVTOOLS__!.clearNetwork();
         expect(count).toBe(2);
-        expect(globalThis.__RN_AI_DEVTOOLS__!.getNetworkRequests()).toHaveLength(0);
+        expect(globalThis.__RN_AI_DEVTOOLS__!.getNetworkEntries()).toHaveLength(0);
     });
 
     it('exposes stores on the global', () => {
@@ -131,10 +128,10 @@ describe('integration', () => {
         expect(globalThis.__RN_AI_DEVTOOLS__!.custom).toEqual({});
     });
 
-    it('console methods are exposed on global', () => {
+    it('console entries are accessible via global', () => {
         init();
 
-        expect(typeof globalThis.__RN_AI_DEVTOOLS__!.getConsoleLogs).toBe('function');
+        expect(typeof globalThis.__RN_AI_DEVTOOLS__!.getConsoleEntries).toBe('function');
         expect(typeof globalThis.__RN_AI_DEVTOOLS__!.clearConsole).toBe('function');
     });
 
@@ -143,10 +140,8 @@ describe('integration', () => {
 
         console.log('integration test log');
 
-        const logs = globalThis.__RN_AI_DEVTOOLS__!.getConsoleLogs();
-        // May have more than 1 entry from test framework output,
-        // so filter for our specific message
-        const ourLog = logs.find((l) => l.message.includes('integration test log'));
+        const entries = globalThis.__RN_AI_DEVTOOLS__!.getConsoleEntries();
+        const ourLog = entries.find((l) => l.message.includes('integration test log'));
         expect(ourLog).toBeDefined();
         expect(ourLog!.level).toBe('log');
     });
@@ -157,9 +152,9 @@ describe('integration', () => {
         console.log('msg1');
         console.warn('msg2');
 
-        const logs = globalThis.__RN_AI_DEVTOOLS__!.getConsoleLogs();
+        const entries = globalThis.__RN_AI_DEVTOOLS__!.getConsoleEntries();
         const count = globalThis.__RN_AI_DEVTOOLS__!.clearConsole();
-        expect(count).toBe(logs.length);
-        expect(globalThis.__RN_AI_DEVTOOLS__!.getConsoleLogs()).toHaveLength(0);
+        expect(count).toBe(entries.length);
+        expect(globalThis.__RN_AI_DEVTOOLS__!.getConsoleEntries()).toHaveLength(0);
     });
 });

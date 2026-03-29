@@ -8,10 +8,7 @@ import { InitOptions } from './types';
 export type {
     InitOptions,
     NetworkEntry,
-    NetworkQueryOptions,
-    NetworkStats,
     ConsoleEntry,
-    ConsoleQueryOptions,
     Capabilities,
     DevToolsGlobal,
 } from './types';

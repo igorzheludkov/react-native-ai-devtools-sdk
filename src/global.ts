@@ -1,6 +1,6 @@
 import { NetworkBuffer } from './networkBuffer';
 import { ConsoleBuffer } from './consoleBuffer';
-import { DevToolsGlobal, NetworkQueryOptions, ConsoleQueryOptions, Capabilities } from './types';
+import { DevToolsGlobal, Capabilities } from './types';
 
 declare global {
     // eslint-disable-next-line no-var
@@ -20,16 +20,14 @@ export function exposeGlobal(options: ExposeGlobalOptions): void {
     const { networkBuffer, consoleBuffer, stores, navigation, custom, capabilities } = options;
 
     const devtools: DevToolsGlobal = {
-        version: '0.2.0',
+        version: '0.3.0',
         capabilities,
         stores,
         navigation,
         custom,
-        getNetworkRequests: (opts?: NetworkQueryOptions) => networkBuffer.query(opts),
-        getNetworkRequest: (id: string) => networkBuffer.get(id),
-        getNetworkStats: () => networkBuffer.getStats(),
+        getNetworkEntries: () => networkBuffer.getAll(),
+        getConsoleEntries: () => consoleBuffer.getAll(),
         clearNetwork: () => networkBuffer.clear(),
-        getConsoleLogs: (opts?: ConsoleQueryOptions) => consoleBuffer.query(opts),
         clearConsole: () => consoleBuffer.clear(),
     };
 

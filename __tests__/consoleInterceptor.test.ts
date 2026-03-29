@@ -24,7 +24,7 @@ describe('consoleInterceptor', () => {
         patchConsole(buffer);
         console.log('hello world');
 
-        const entries = buffer.query();
+        const entries = buffer.getAll();
         expect(entries).toHaveLength(1);
         expect(entries[0].level).toBe('log');
         expect(entries[0].message).toBe('hello world');
@@ -34,7 +34,7 @@ describe('consoleInterceptor', () => {
         patchConsole(buffer);
         console.warn('warning message');
 
-        const entries = buffer.query();
+        const entries = buffer.getAll();
         expect(entries).toHaveLength(1);
         expect(entries[0].level).toBe('warn');
         expect(entries[0].message).toBe('warning message');
@@ -44,7 +44,7 @@ describe('consoleInterceptor', () => {
         patchConsole(buffer);
         console.error('error occurred');
 
-        const entries = buffer.query();
+        const entries = buffer.getAll();
         expect(entries).toHaveLength(1);
         expect(entries[0].level).toBe('error');
         expect(entries[0].message).toBe('error occurred');
@@ -54,7 +54,7 @@ describe('consoleInterceptor', () => {
         patchConsole(buffer);
         console.info('info message');
 
-        const entries = buffer.query();
+        const entries = buffer.getAll();
         expect(entries).toHaveLength(1);
         expect(entries[0].level).toBe('info');
     });
@@ -63,7 +63,7 @@ describe('consoleInterceptor', () => {
         patchConsole(buffer);
         console.debug('debug message');
 
-        const entries = buffer.query();
+        const entries = buffer.getAll();
         expect(entries).toHaveLength(1);
         expect(entries[0].level).toBe('debug');
     });
@@ -72,7 +72,7 @@ describe('consoleInterceptor', () => {
         patchConsole(buffer);
         console.log('count:', 42, { key: 'value' });
 
-        const entries = buffer.query();
+        const entries = buffer.getAll();
         expect(entries[0].message).toBe('count: 42 {"key":"value"}');
     });
 

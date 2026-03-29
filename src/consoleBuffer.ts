@@ -1,4 +1,4 @@
-import { ConsoleEntry, ConsoleQueryOptions } from './types';
+import { ConsoleEntry } from './types';
 
 export class ConsoleBuffer {
     private entries: ConsoleEntry[] = [];
@@ -15,31 +15,8 @@ export class ConsoleBuffer {
         this.entries.push(entry);
     }
 
-    query(options?: ConsoleQueryOptions): ConsoleEntry[] {
-        let results = [...this.entries].reverse();
-
-        if (options?.level) {
-            results = results.filter((e) => e.level === options.level);
-        }
-
-        if (options?.text) {
-            const text = options.text.toLowerCase();
-            results = results.filter((e) => e.message.toLowerCase().includes(text));
-        }
-
-        if (options?.count != null && options.count > 0) {
-            results = results.slice(0, options.count);
-        }
-
-        return results;
-    }
-
-    getStats(): { total: number; byLevel: Record<string, number> } {
-        const byLevel: Record<string, number> = {};
-        for (const entry of this.entries) {
-            byLevel[entry.level] = (byLevel[entry.level] || 0) + 1;
-        }
-        return { total: this.entries.length, byLevel };
+    getAll(): ConsoleEntry[] {
+        return [...this.entries];
     }
 
     clear(): number {
