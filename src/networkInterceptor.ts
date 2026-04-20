@@ -1,7 +1,19 @@
 import { NetworkBuffer } from './networkBuffer';
 import { NetworkEntry } from './types';
 
-let originalFetch: typeof globalThis.fetch | null = null;
+interface PerRequestState {
+    id: string;
+    method: string;
+    url: string;
+    requestHeaders: Record<string, string>;
+    startTime: number;
+}
+
+const stateMap = new WeakMap<XMLHttpRequest, PerRequestState>();
+
+let originalOpen: typeof XMLHttpRequest.prototype.open | null = null;
+let originalSend: typeof XMLHttpRequest.prototype.send | null = null;
+let originalSetRequestHeader: typeof XMLHttpRequest.prototype.setRequestHeader | null = null;
 let idCounter = 0;
 
 function generateId(): string {
@@ -10,147 +22,266 @@ function generateId(): string {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractHeaders(headers?: any): Record<string, string> {
-    const result: Record<string, string> = {};
-
-    if (!headers) {
-        return result;
-    }
-
-    if (typeof headers.forEach === 'function') {
-        headers.forEach((value: string, key: string) => {
-            result[key] = value;
-        });
-    } else if (Array.isArray(headers)) {
-        for (const [key, value] of headers) {
-            result[key] = value;
-        }
-    } else if (typeof headers === 'object') {
-        Object.assign(result, headers);
-    }
-
-    return result;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractBody(body?: any): string | undefined {
+function stringifyBody(body: any): string | undefined {
     if (body == null) {
         return undefined;
     }
-
-    if (typeof body === 'string') {
-        return body;
+    try {
+        if (typeof body === 'string') {
+            return body;
+        }
+        if (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) {
+            return body.toString();
+        }
+        if (typeof FormData !== 'undefined' && body instanceof FormData) {
+            return stringifyFormData(body);
+        }
+        if (typeof Blob !== 'undefined' && body instanceof Blob) {
+            return typeof body.size === 'number'
+                ? `[binary body, ${body.size} bytes]`
+                : '[binary body]';
+        }
+        if (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer) {
+            return typeof body.byteLength === 'number'
+                ? `[binary body, ${body.byteLength} bytes]`
+                : '[binary body]';
+        }
+        if (typeof ArrayBuffer !== 'undefined' && ArrayBuffer.isView(body)) {
+            const view = body as ArrayBufferView;
+            return typeof view.byteLength === 'number'
+                ? `[binary body, ${view.byteLength} bytes]`
+                : '[binary body]';
+        }
+        if (typeof Document !== 'undefined' && body instanceof Document) {
+            return '[document body]';
+        }
+        return '[non-string body]';
+    } catch {
+        return '[non-string body]';
     }
-
-    return '[non-string body]';
 }
 
-function responseHeadersToRecord(headers: Headers): Record<string, string> {
+function stringifyFormData(fd: FormData): string {
+    try {
+        const obj: Record<string, string> = {};
+        // React Native's FormData polyfill exposes `_parts` (an array of
+        // [key, value] tuples). Native FormData coerces non-Blob values to
+        // strings via String(value) during iteration, which loses RN's
+        // `{ uri, name, type }` file shape. Prefer `_parts` when present.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const parts: Array<[string, unknown]> | undefined = (fd as any)._parts;
+        const entries: Array<[string, unknown]> = Array.isArray(parts)
+            ? parts
+            : [];
+        if (entries.length === 0) {
+            fd.forEach((value, key) => entries.push([key, value]));
+        }
+        for (const [key, value] of entries) {
+            if (typeof Blob !== 'undefined' && value instanceof Blob) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const name = (value as any).name as string | undefined;
+                if (name) {
+                    obj[key] = `[file: ${name}]`;
+                } else if (typeof value.size === 'number') {
+                    obj[key] = `[file: ${value.size} bytes]`;
+                } else {
+                    obj[key] = '[file]';
+                }
+            } else if (
+                value != null &&
+                typeof value === 'object' &&
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                'uri' in (value as any)
+            ) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const rn = value as any;
+                obj[key] = `[file: ${rn.name ?? rn.uri}]`;
+            } else {
+                obj[key] = String(value);
+            }
+        }
+        return JSON.stringify(obj);
+    } catch {
+        return '[formdata]';
+    }
+}
+
+function parseResponseHeaders(raw: string): Record<string, string> {
     const result: Record<string, string> = {};
-    headers.forEach((value, key) => {
+    if (!raw) {
+        return result;
+    }
+    const lines = raw.split(/\r\n/);
+    for (const line of lines) {
+        if (!line) {
+            continue;
+        }
+        const idx = line.indexOf(': ');
+        if (idx === -1) {
+            continue;
+        }
+        const key = line.slice(0, idx).toLowerCase();
+        const value = line.slice(idx + 2);
         result[key] = value;
-    });
+    }
     return result;
 }
 
-export function patchFetch(buffer: NetworkBuffer): void {
-    if (originalFetch) {
+function extractResponseBody(xhr: XMLHttpRequest): string | undefined {
+    try {
+        const rt = xhr.responseType;
+        if (rt === '' || rt === 'text') {
+            return xhr.responseText;
+        }
+        if (rt === 'json') {
+            return JSON.stringify(xhr.response);
+        }
+        if (rt === 'arraybuffer') {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ab = xhr.response as any;
+            const size = ab && typeof ab.byteLength === 'number' ? ab.byteLength : null;
+            return size != null ? `[binary response, ${size} bytes]` : '[binary response]';
+        }
+        if (rt === 'blob') {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const b = xhr.response as any;
+            const size = b && typeof b.size === 'number' ? b.size : null;
+            return size != null ? `[binary response, ${size} bytes]` : '[binary response]';
+        }
+        if (rt === 'document') {
+            return '[document response]';
+        }
+        return undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+export function patchXHR(buffer: NetworkBuffer): void {
+    if (originalOpen) {
+        return;
+    }
+    if (typeof XMLHttpRequest === 'undefined') {
         return;
     }
 
-    originalFetch = globalThis.fetch;
+    originalOpen = XMLHttpRequest.prototype.open;
+    originalSend = XMLHttpRequest.prototype.send;
+    originalSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
 
-    globalThis.fetch = async function patchedFetch(
-        input: Parameters<typeof fetch>[0],
-        init?: Parameters<typeof fetch>[1],
-    ): Promise<Response> {
-        const id = generateId();
-        const startTime = Date.now();
-
-        let url: string;
-        let method: string;
-        let requestHeaders: Record<string, string>;
-        let requestBody: string | undefined;
-
+    XMLHttpRequest.prototype.open = function patchedOpen(
+        this: XMLHttpRequest,
+        method: string,
+        url: string | URL,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...rest: any[]
+    ): void {
         try {
-            if (input instanceof Request) {
-                url = input.url;
-                method = (init?.method || input.method || 'GET').toUpperCase();
-                requestHeaders = extractHeaders(init?.headers ?? input.headers);
-                requestBody = extractBody(init?.body);
-            } else {
-                url = typeof input === 'string' ? input : input.toString();
-                method = (init?.method || 'GET').toUpperCase();
-                requestHeaders = extractHeaders(init?.headers);
-                requestBody = extractBody(init?.body);
-            }
+            stateMap.set(this, {
+                id: generateId(),
+                method: (method || 'GET').toUpperCase(),
+                url: typeof url === 'string' ? url : String(url),
+                requestHeaders: {},
+                startTime: 0,
+            });
         } catch {
-            url = String(input);
-            method = 'GET';
-            requestHeaders = {};
-            requestBody = undefined;
+            // ignore — never break the user's request
         }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (originalOpen as any).apply(this, [method, url, ...rest]);
+    };
 
-        const entry: NetworkEntry = {
-            id,
-            timestamp: startTime,
-            method,
-            url,
-            requestHeaders,
-            requestBody,
-            responseHeaders: {},
-            completed: false,
-        };
+    XMLHttpRequest.prototype.setRequestHeader = function patchedSetRequestHeader(
+        this: XMLHttpRequest,
+        name: string,
+        value: string,
+    ): void {
+        const state = stateMap.get(this);
+        if (state) {
+            state.requestHeaders[name] = value;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (originalSetRequestHeader as any).call(this, name, value);
+    };
 
-        buffer.add(entry);
+    XMLHttpRequest.prototype.send = function patchedSend(
+        this: XMLHttpRequest,
+        body?: Document | XMLHttpRequestBodyInit | null,
+    ): void {
+        const state = stateMap.get(this);
+        if (state) {
+            state.startTime = Date.now();
 
-        try {
-            const response = await originalFetch!.call(globalThis, input, init);
-            const duration = Date.now() - startTime;
+            const entry: NetworkEntry = {
+                id: state.id,
+                timestamp: state.startTime,
+                method: state.method,
+                url: state.url,
+                requestHeaders: { ...state.requestHeaders },
+                requestBody: stringifyBody(body),
+                responseHeaders: {},
+                completed: false,
+            };
+            buffer.add(entry);
 
-            const responseHeaders = responseHeadersToRecord(response.headers);
-            const mimeType = response.headers.get('content-type') ?? undefined;
+            const xhr = this;
 
-            buffer.update(id, {
-                status: response.status,
-                statusText: response.statusText,
-                duration,
-                responseHeaders,
-                mimeType,
-                completed: true,
-            });
+            const onLoad = (): void => {
+                try {
+                    const duration = Date.now() - state.startTime;
+                    const responseHeaders = parseResponseHeaders(
+                        xhr.getAllResponseHeaders(),
+                    );
+                    const mimeType = xhr.getResponseHeader('content-type') ?? undefined;
+                    const updates: Partial<NetworkEntry> = {
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                        duration,
+                        responseHeaders,
+                        mimeType,
+                        responseBody: extractResponseBody(xhr),
+                        completed: true,
+                    };
+                    if (xhr.responseURL && xhr.responseURL !== state.url) {
+                        updates.responseURL = xhr.responseURL;
+                    }
+                    buffer.update(state.id, updates);
+                } catch {
+                    buffer.update(state.id, { completed: true });
+                }
+            };
 
-            // Capture response body without consuming the original response
-            try {
-                response.clone().text().then((body) => {
-                    buffer.update(id, { responseBody: body });
-                }).catch(() => {
-                    // ignore body read failures
+            const terminalUpdate = (
+                error: string,
+                errorType: NetworkEntry['errorType'],
+            ): void => {
+                buffer.update(state.id, {
+                    status: 0,
+                    duration: Date.now() - state.startTime,
+                    error,
+                    errorType,
+                    completed: true,
                 });
-            } catch {
-                // ignore clone failures
-            }
+            };
 
-            return response;
-        } catch (err: unknown) {
-            const duration = Date.now() - startTime;
-            const errorMessage = err instanceof Error ? err.message : String(err);
-
-            buffer.update(id, {
-                error: errorMessage,
-                duration,
-                completed: true,
-            });
-
-            throw err;
+            xhr.addEventListener('load', onLoad);
+            xhr.addEventListener('error', () => terminalUpdate('network error', 'network'));
+            xhr.addEventListener('abort', () => terminalUpdate('aborted', 'abort'));
+            xhr.addEventListener('timeout', () => terminalUpdate('timeout', 'timeout'));
         }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (originalSend as any).call(this, body);
     };
 }
 
-export function unpatchFetch(): void {
-    if (originalFetch) {
-        globalThis.fetch = originalFetch;
-        originalFetch = null;
+export function unpatchXHR(): void {
+    if (originalOpen && originalSend && originalSetRequestHeader) {
+        XMLHttpRequest.prototype.open = originalOpen;
+        XMLHttpRequest.prototype.send = originalSend;
+        XMLHttpRequest.prototype.setRequestHeader = originalSetRequestHeader;
     }
+    originalOpen = null;
+    originalSend = null;
+    originalSetRequestHeader = null;
     idCounter = 0;
 }

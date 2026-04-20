@@ -1,6 +1,6 @@
 import { NetworkBuffer } from './networkBuffer';
 import { ConsoleBuffer } from './consoleBuffer';
-import { patchFetch } from './networkInterceptor';
+import { patchXHR, unpatchXHR } from './networkInterceptor';
 import { patchConsole } from './consoleInterceptor';
 import { exposeGlobal } from './global';
 import { InitOptions } from './types';
@@ -33,7 +33,7 @@ export function init(options?: InitOptions): void {
     const navigation = options?.navigation ?? null;
     const custom = options?.custom ?? {};
 
-    patchFetch(networkBuffer);
+    patchXHR(networkBuffer);
     patchConsole(consoleBuffer);
 
     exposeGlobal({
@@ -57,5 +57,6 @@ export function init(options?: InitOptions): void {
 // Exported for testing purposes
 export function _resetForTesting(): void {
     initialized = false;
+    unpatchXHR();
     delete globalThis.__RN_AI_DEVTOOLS__;
 }

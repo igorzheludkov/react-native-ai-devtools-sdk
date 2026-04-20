@@ -1,43 +1,38 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { init, _resetForTesting } from '../src/index';
-import { unpatchFetch } from '../src/networkInterceptor';
+import { unpatchXHR } from '../src/networkInterceptor';
 import { unpatchConsole } from '../src/consoleInterceptor';
-
-function createMockResponse(body: string, init?: ResponseInit): Response {
-    return new Response(body, init);
-}
+import { installMockXHR, uninstallMockXHR, lastInstance } from './mockXHR';
 
 describe('integration', () => {
-    let mockFetch: ReturnType<typeof jest.fn<typeof globalThis.fetch>>;
-
     beforeEach(() => {
-        unpatchFetch();
+        unpatchXHR();
         unpatchConsole();
         _resetForTesting();
-        mockFetch = jest.fn<typeof globalThis.fetch>();
-        globalThis.fetch = mockFetch;
+        installMockXHR();
     });
 
     afterEach(() => {
-        unpatchFetch();
+        unpatchXHR();
         unpatchConsole();
         _resetForTesting();
+        uninstallMockXHR();
     });
 
-    it('init() exposes global and captures fetch', async () => {
-        mockFetch.mockResolvedValue(
-            createMockResponse('{"data":1}', {
-                status: 200,
-                headers: { 'content-type': 'application/json' },
-            }),
-        );
-
+    it('init() exposes global and captures XHR requests', () => {
         init();
 
         expect(globalThis.__RN_AI_DEVTOOLS__).toBeDefined();
-        expect(globalThis.__RN_AI_DEVTOOLS__!.version).toBe('0.3.0');
+        expect(globalThis.__RN_AI_DEVTOOLS__!.version).toBe('0.4.0');
 
-        await globalThis.fetch('https://api.example.com/test');
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', 'https://api.example.com/test');
+        xhr.send();
+        lastInstance()._fireLoad({
+            status: 200,
+            body: '{"data":1}',
+            headers: { 'content-type': 'application/json' },
+        });
 
         const entries = globalThis.__RN_AI_DEVTOOLS__!.getNetworkEntries();
         expect(entries).toHaveLength(1);
@@ -53,14 +48,18 @@ describe('integration', () => {
         expect(globalThis.__RN_AI_DEVTOOLS__).toBe(first);
     });
 
-    it('clearNetwork returns count and empties buffer', async () => {
-        mockFetch.mockResolvedValue(
-            createMockResponse('ok', { status: 200 }),
-        );
-
+    it('clearNetwork returns count and empties buffer', () => {
         init();
-        await globalThis.fetch('https://api.example.com/a');
-        await globalThis.fetch('https://api.example.com/b');
+
+        const a = new XMLHttpRequest();
+        a.open('GET', 'https://api.example.com/a');
+        a.send();
+        lastInstance()._fireLoad({ status: 200, body: 'ok' });
+
+        const b = new XMLHttpRequest();
+        b.open('GET', 'https://api.example.com/b');
+        b.send();
+        lastInstance()._fireLoad({ status: 200, body: 'ok' });
 
         const count = globalThis.__RN_AI_DEVTOOLS__!.clearNetwork();
         expect(count).toBe(2);

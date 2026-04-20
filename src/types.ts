@@ -21,6 +21,8 @@ export interface NetworkEntry {
     responseBody?: string;
     mimeType?: string;
     error?: string;
+    errorType?: 'abort' | 'timeout' | 'network';
+    responseURL?: string;
     completed: boolean;
 }
 
